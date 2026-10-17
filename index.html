@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Matrix Rain - Separate Flow & Recording Options</title>
+    <title>The Matrix Rain - Auto-Record & Repeatable Transition</title>
     <style>
         * {
             margin: 0;
@@ -240,12 +240,12 @@
             
             <div class="control-item">
                 <label class="file-upload-btn" for="imageInput">
-                    📁 選擇上傳白狗照片...
+                    📁 選擇自訂照片...
                 </label>
                 <input type="file" id="imageInput" accept="image/*">
             </div>
 
-            <div class="control-item" id="imgControls" style="display: none;">
+            <div class="control-item" id="imgControls">
                 <button class="btn-action" id="btnRemoveImg">移除圖片</button>
             </div>
 
@@ -304,7 +304,7 @@
             </div>
 
             <div class="tip-box">
-                💡 點擊「啟動照片瀑布雨 (不錄影)」可單純觀賞效果；點擊「🎥 自動錄影存檔」會在完成解碼 3 秒後自動下載 WebM 影片！
+                💡 頁面已預設自動載入同目錄下的 DSCF2875.jpeg！
             </div>
         </div>
     </div>
@@ -325,7 +325,7 @@
         let imgWaterfalls = [];
 
         let isTransitioning = false;
-        let recordingState = 'idle'; // 'idle', 'recording', 'finished'
+        let recordingState = 'idle';
         let mediaRecorder = null;
         let recordedChunks = [];
         let postDecodeTimer = 0;
@@ -386,7 +386,13 @@
 
             createCharTextures();
             build3DVolumetricRain();
-            render3DHeightmapMesh();
+
+            // 預設載入同一目錄下的 DSCF2875.jpeg 照片
+            uploadedImg = new Image();
+            uploadedImg.onload = function() {
+                render3DHeightmapMesh();
+            };
+            uploadedImg.src = 'DSCF2875.jpeg';
 
             window.addEventListener('resize', onWindowResize);
         }
@@ -721,7 +727,6 @@
             renderer.render(scene, camera);
         }
 
-        // 面板與按鈕點擊邏輯
         const panel = document.getElementById('controlPanel');
         const toggleBtn = document.getElementById('togglePanelBtn');
 
@@ -760,7 +765,6 @@
             render3DHeightmapMesh();
         });
 
-        // 1. 啟動照片瀑布雨（不錄影）
         document.getElementById('btnStartTransition').addEventListener('click', () => {
             render3DHeightmapMesh();
             isTransitioning = true;
@@ -768,13 +772,12 @@
             toggleBtn.innerText = '⚙️';
         });
 
-        // 2. 啟動照片瀑布雨 + 自動錄影存檔
         document.getElementById('btnStartWithRecord').addEventListener('click', () => {
             render3DHeightmapMesh();
             isTransitioning = true;
             panel.classList.add('collapsed');
             toggleBtn.innerText = '⚙️';
-            startRecording(); // 啟動錄影
+            startRecording();
         });
 
         document.getElementById('inputMainText').addEventListener('input', (e) => {
