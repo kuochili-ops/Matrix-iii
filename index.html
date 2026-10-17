@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Matrix Rain - Separate Flow & Recording Options</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Courier New', Courier, monospace;
+            color: #00ff41;
+        }
+
+        canvas#webglCanvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* 錄影狀態提示燈 */
+        .recording-badge {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(255, 0, 0, 0.85);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.6);
+            animation: blink 1s infinite alternate;
+        }
+        @keyframes blink {
+            from { opacity: 1; }
+            to { opacity: 0.4; }
+        }
+
+        /* 浮動控制面板開關按鈕 */
+        .toggle-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            width: 48px;
+            height: 48px;
+            background: rgba(0, 15, 5, 0.85);
+            border: 2px solid #00ff41;
+            border-radius: 50%;
+            color: #00ff41;
+            font-size: 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+            transition: all 0.3s ease;
+        }
+        .toggle-btn:hover {
+            transform: scale(1.1) rotate(45deg);
+            background: #00ff41;
+            color: #000;
+            box-shadow: 0 0 25px #00ff41;
+        }
+
+        /* 控制面板 Drawer */
+        .control-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            bottom: 30px;
+            width: 320px;
+            z-index: 90;
+            background: rgba(4, 16, 8, 0.92);
+            border: 1px solid #00ff41;
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.25);
+            backdrop-filter: blur(10px);
+            overflow-y: auto;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+            color: #00ff41;
+        }
+        .control-panel.collapsed {
+            transform: translateX(360px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .control-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+        .control-panel::-webkit-scrollbar-thumb {
+            background: #00ff41;
+            border-radius: 2px;
+        }
+
+        .panel-title {
+            font-size: 1.05rem;
+            font-weight: bold;
+            border-bottom: 1px solid #00ff41;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .section-group {
+            margin-bottom: 16px;
+            background: rgba(0, 255, 65, 0.05);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 255, 65, 0.2);
+        }
+        .section-title {
+            font-size: 0.85rem;
+            color: #fff;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .control-item {
+            margin-bottom: 10px;
+        }
+        .control-item:last-child {
+            margin-bottom: 0;
+        }
+        .control-item label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            background: #000;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #00ff41;
+            cursor: pointer;
+        }
+
+        .file-upload-btn {
+            display: block;
+            width: 100%;
+            text-align: center;
+            background: rgba(0, 255, 65, 0.15);
+            border: 1px dashed #00ff41;
+            color: #00ff41;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .file-upload-btn:hover {
+            background: #00ff41;
+            color: #000;
+            font-weight: bold;
+        }
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn-action {
+            width: 100%;
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: all 0.2s;
+            font-family: inherit;
+            text-transform: uppercase;
+        }
+
+        .tip-box {
+            font-size: 0.75rem;
+            color: #88ffaa;
+            margin-top: 6px;
+            line-height: 1.3;
+        }
+
+        @media (max-width: 480px) {
+            .control-panel {
+                width: calc(100% - 40px);
+                right: 20px;
+                top: 75px;
+                bottom: 20px;
+            }
+        }
+    </style>
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div class="recording-badge" id="recBadge">🔴 正在自動錄影中...</div>
+
+    <canvas id="webglCanvas"></canvas>
+
+    <button class="toggle-btn" id="togglePanelBtn" title="展開/收合控制選單">⚙️</button>
+
+    <div class="control-panel" id="controlPanel">
+        <div class="panel-title">照片解碼矩陣控制</div>
+
+        <div class="section-group">
+            <div class="section-title">🖼️ 圖案與文字設定</div>
+            
+            <div class="control-item">
+                <label class="file-upload-btn" for="imageInput">
+                    📁 選擇上傳白狗照片...
+                </label>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+
+            <div class="control-item" id="imgControls" style="display: none;">
+                <button class="btn-action" id="btnRemoveImg">移除圖片</button>
+            </div>
+
+            <div class="control-item">
+                <label>圖案下方的文字</label>
+                <input type="text" id="inputMainText" value="白六問候親友們">
+            </div>
+            <div class="control-item">
+                <label>副標題</label>
+                <input type="text" id="inputSubText" value="SYSTEM ONLINE">
+            </div>
+
+            <div class="control-item" style="margin-top: 8px;">
+                <button class="btn-action" id="btnResetToPhoto">📷 重置為完整原圖</button>
+                <button class="btn-action" id="btnStartTransition" style="margin-top:6px; background:#00e5ff;">⚡ 啟動照片瀑布雨 (不錄影)</button>
+                <button class="btn-action" id="btnStartWithRecord" style="margin-top:6px; background:#ff3366; color:#fff;">🎥 啟動照片瀑布雨 + 自動錄影存檔</button>
+            </div>
+        </div>
+
+        <div class="section-group">
+            <div class="section-title">⚡ 漸變速度與尺寸微調</div>
+
+            <div class="control-item">
+                <label>解碼轉化速度 <span id="valTransitionSpeed">0.5x</span></label>
+                <input type="range" id="sliderTransitionSpeed" min="0.1" max="2.0" step="0.1" value="0.5">
+            </div>
+
+            <div class="control-item">
+                <label>圖文瀑布雨流速 <span id="valFlowSpeed">1.2</span></label>
+                <input type="range" id="sliderFlowSpeed" min="0.2" max="3.0" step="0.1" value="1.2">
+            </div>
+
+            <div class="control-item">
+                <label>整體縮放尺寸 <span id="valImgScale">105%</span></label>
+                <input type="range" id="sliderImgScale" min="50" max="150" value="105">
+            </div>
+
+            <div class="control-item">
+                <label>3D 浮雕突起高度 <span id="valDepth">80</span></label>
+                <input type="range" id="sliderDepth" min="0" max="200" value="80">
+            </div>
+
+            <div class="control-item">
+                <label>3D 點陣密度 (解析度) <span id="valGridDensity">110</span></label>
+                <input type="range" id="sliderGridDensity" min="60" max="180" value="110">
+            </div>
+
+            <div class="control-item">
+                <label>主題配色</label>
+                <select id="selectTheme">
+                    <option value="matrix">經典螢光綠 (Matrix Green)</option>
+                    <option value="cyan">賽博霓虹藍 (Neon Cyan)</option>
+                    <option value="gold">駭客金 (Cyber Gold)</option>
+                    <option value="white">單色高亮 (Monochrome)</option>
+                </select>
+            </div>
+
+            <div class="tip-box">
+                💡 點擊「啟動照片瀑布雨 (不錄影)」可單純觀賞效果；點擊「🎥 自動錄影存檔」會在完成解碼 3 秒後自動下載 WebM 影片！
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('webglCanvas');
+
+        const DENSITY_CHARS = [" ", ".", "'", ":", "-", "=", "+", "*", "c", "o", "x", "7", "1", "X", "W", "日", "木", "龘", "█"];
+
+        let scene, camera, renderer, controls;
+        let rainGroup = new THREE.Group();
+        let meshGroup = new THREE.Group();
+        let photoPlaneMesh = null;
+
+        let uploadedImg = null;
+        let charTextures = [];
+        let meshParticles = [];
+        let imgWaterfalls = [];
+
+        let isTransitioning = false;
+        let recordingState = 'idle'; // 'idle', 'recording', 'finished'
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let postDecodeTimer = 0;
+
+        let config = {
+            depth: 80,
+            imgScale: 1.05,
+            gridDensity: 110,
+            flowSpeed: 1.2,
+            transitionSpeed: 0.5,
+            theme: 'matrix',
+            mainText: '白六問候親友們',
+            subText: 'SYSTEM ONLINE'
+        };
+
+        function createCharTextures() {
+            charTextures = [];
+            DENSITY_CHARS.forEach(char => {
+                const texCanvas = document.createElement('canvas');
+                texCanvas.width = 64;
+                texCanvas.height = 64;
+                const texCtx = texCanvas.getContext('2d');
+
+                texCtx.fillStyle = '#000000';
+                texCtx.fillRect(0, 0, 64, 64);
+
+                texCtx.font = 'bold 46px monospace';
+                texCtx.fillStyle = '#ffffff';
+                texCtx.textAlign = 'center';
+                texCtx.textBaseline = 'middle';
+                texCtx.fillText(char, 32, 32);
+
+                const texture = new THREE.CanvasTexture(texCanvas);
+                texture.minFilter = THREE.LinearFilter;
+                charTextures.push(texture);
+            });
+        }
+
+        function initThree() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.001);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 3000);
+            camera.position.set(0, 0, 520);
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.rotateSpeed = 0.8;
+            controls.autoRotate = false;
+
+            scene.add(rainGroup);
+            scene.add(meshGroup);
+
+            createCharTextures();
+            build3DVolumetricRain();
+            render3DHeightmapMesh();
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function build3DVolumetricRain() {
+            while(rainGroup.children.length > 0) { 
+                const obj = rainGroup.children.pop();
+                if (obj.geometry) obj.geometry.dispose();
+            }
+
+            const rainCount = 130;
+            for (let i = 0; i < rainCount; i++) {
+                const lineLength = Math.floor(Math.random() * 15 + 10);
+                const x = (Math.random() - 0.5) * 1600;
+                const z = (Math.random() - 0.5) * 1400;
+                const startY = Math.random() * 1000 - 500;
+                const speed = Math.random() * 4 + 2;
+
+                const columnGroup = new THREE.Group();
+                columnGroup.position.set(x, startY, z);
+                columnGroup.userData = { speed: speed, length: lineLength };
+
+                for (let j = 0; j < lineLength; j++) {
+                    const texIndex = Math.floor(Math.random() * (charTextures.length - 1)) + 1;
+                    const mat = new THREE.SpriteMaterial({
+                        map: charTextures[texIndex],
+                        transparent: true,
+                        opacity: j === 0 ? 1.0 : (1 - j / lineLength) * 0.7,
+                        color: j === 0 ? new THREE.Color(0xffffff) : getThemeThreeColor(0.8)
+                    });
+
+                    const sprite = new THREE.Sprite(mat);
+                    sprite.position.y = -j * 18;
+                    sprite.scale.set(16, 16, 1);
+                    columnGroup.add(sprite);
+                }
+
+                rainGroup.add(columnGroup);
+            }
+        }
+
+        function createSharpTextSprite(text, fontSizePx, colorHex = '#00ff41') {
+            const tCanvas = document.createElement('canvas');
+            tCanvas.width = 1024;
+            tCanvas.height = 256;
+            const tCtx = tCanvas.getContext('2d');
+
+            tCtx.font = `900 ${fontSizePx}px "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif`;
+            tCtx.fillStyle = colorHex;
+            tCtx.textAlign = 'center';
+            tCtx.textBaseline = 'middle';
+
+            tCtx.shadowColor = '#00ff41';
+            tCtx.shadowBlur = 12;
+            tCtx.fillText(text, 512, 128);
+
+            const texture = new THREE.CanvasTexture(tCanvas);
+            texture.minFilter = THREE.LinearFilter;
+
+            const mat = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 1.0
+            });
+
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(450 * config.imgScale, 112 * config.imgScale, 1);
+            return sprite;
+        }
+
+        function render3DHeightmapMesh() {
+            while(meshGroup.children.length > 0) { 
+                const obj = meshGroup.children.pop();
+                if (obj.geometry) obj.geometry.dispose();
+            }
+
+            meshParticles = [];
+            imgWaterfalls = [];
+            isTransitioning = false;
+            recordingState = 'idle';
+            postDecodeTimer = 0;
+
+            const cols = config.gridDensity;
+            const rows = config.gridDensity;
+
+            const planeW = 400 * config.imgScale;
+            const planeH = 500 * config.imgScale;
+
+            const renderCanvas = document.createElement('canvas');
+            renderCanvas.width = 800;
+            renderCanvas.height = 1000;
+            const rCtx = renderCanvas.getContext('2d');
+
+            rCtx.fillStyle = '#000000';
+            rCtx.fillRect(0, 0, 800, 1000);
+
+            if (uploadedImg && uploadedImg.complete) {
+                const aspect = uploadedImg.width / uploadedImg.height;
+                let drawW = 760;
+                let drawH = Math.floor(drawW / aspect);
+                if (drawH > 960) {
+                    drawH = 960;
+                    drawW = Math.floor(drawH * aspect);
+                }
+                const drawX = (800 - drawW) / 2;
+                rCtx.drawImage(uploadedImg, drawX, 20, drawW, drawH);
+            }
+
+            const photoTexture = new THREE.CanvasTexture(renderCanvas);
+            const planeGeo = new THREE.PlaneGeometry(planeW, planeH);
+            const planeMat = new THREE.MeshBasicMaterial({
+                map: photoTexture,
+                transparent: true,
+                opacity: 1.0,
+                side: THREE.DoubleSide
+            });
+
+            photoPlaneMesh = new THREE.Mesh(planeGeo, planeMat);
+            photoPlaneMesh.position.set(0, 40, 10);
+            meshGroup.add(photoPlaneMesh);
+
+            const sampleCanvas = document.createElement('canvas');
+            sampleCanvas.width = cols;
+            sampleCanvas.height = rows;
+            const sampleCtx = sampleCanvas.getContext('2d');
+            sampleCtx.drawImage(renderCanvas, 0, 0, cols, rows);
+
+            const imgData = sampleCtx.getImageData(0, 0, cols, rows).data;
+            const stepX = planeW / cols;
+            const stepY = planeH / rows;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const idx = (r * cols + c) * 4;
+                    const alpha = imgData[idx + 3];
+
+                    if (alpha > 35) {
+                        const red = imgData[idx];
+                        const green = imgData[idx + 1];
+                        const blue = imgData[idx + 2];
+
+                        let gray = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+
+                        if (gray > 0.05) {
+                            const charIdx = Math.floor(gray * (charTextures.length - 1));
+
+                            const codeMat = new THREE.SpriteMaterial({
+                                map: charTextures[charIdx],
+                                transparent: true,
+                                opacity: 0.0,
+                                color: getThemeThreeColor(gray)
+                            });
+                            const codeSprite = new THREE.Sprite(codeMat);
+
+                            const targetX = (c - cols / 2) * stepX;
+                            const targetY = -(r - rows / 2) * stepY + 40;
+                            const targetZ = gray * config.depth;
+
+                            codeSprite.position.set(targetX, targetY, targetZ);
+                            codeSprite.scale.set(stepX * 1.55, stepY * 1.55, 1);
+
+                            meshGroup.add(codeSprite);
+
+                            meshParticles.push({
+                                codeSprite: codeSprite,
+                                gray: gray,
+                                col: c,
+                                row: r,
+                                charIdx: charIdx,
+                                decodeProgress: 0.0
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (config.mainText.trim() !== "") {
+                const mainTextSprite = createSharpTextSprite(config.mainText, 110, '#00ff41');
+                mainTextSprite.position.set(0, -250 * config.imgScale, 15);
+                meshGroup.add(mainTextSprite);
+            }
+
+            if (config.subText.trim() !== "") {
+                const subTextSprite = createSharpTextSprite(config.subText, 55, '#88ffaa');
+                subTextSprite.position.set(0, -305 * config.imgScale, 15);
+                meshGroup.add(subTextSprite);
+            }
+
+            for (let i = 0; i < cols; i++) {
+                imgWaterfalls.push({
+                    col: i,
+                    y: Math.random() * -80,
+                    speed: (config.flowSpeed || 1.2) * (Math.random() * 0.4 + 0.6)
+                });
+            }
+        }
+
+        function startRecording() {
+            recordedChunks = [];
+            const stream = canvas.captureStream(30);
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,vp8' });
+
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = function() {
+                document.getElementById('recBadge').style.display = 'none';
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '白六駭客任務照片版.webm';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            };
+
+            mediaRecorder.start();
+            document.getElementById('recBadge').style.display = 'flex';
+            recordingState = 'recording';
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordingState = 'finished';
+            }
+        }
+
+        function getThemeThreeColor(intensity) {
+            const val = Math.min(1.0, 0.45 + intensity * 0.55);
+            if (config.theme === 'cyan') {
+                return new THREE.Color(0, val, val);
+            } else if (config.theme === 'gold') {
+                return new THREE.Color(val, val * 0.75, 0);
+            } else if (config.theme === 'white') {
+                return new THREE.Color(val, val, val);
+            } else {
+                return new THREE.Color(0, val, val * 0.35);
+            }
+        }
+
+        let flowPhase = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            flowPhase += config.flowSpeed * 0.4;
+
+            rainGroup.children.forEach(columnGroup => {
+                columnGroup.position.y -= columnGroup.userData.speed;
+                if (columnGroup.position.y < -500) {
+                    columnGroup.position.y = 500;
+                    columnGroup.position.x = (Math.random() - 0.5) * 1600;
+                    columnGroup.position.z = (Math.random() - 0.5) * 1400;
+                }
+            });
+
+            const rows = config.gridDensity;
+
+            if (isTransitioning) {
+                imgWaterfalls.forEach(wf => {
+                    wf.y += wf.speed * 0.35 * config.transitionSpeed;
+
+                    meshParticles.forEach(p => {
+                        if (p.col === wf.col && p.row <= wf.y) {
+                            p.decodeProgress = Math.min(1.0, p.decodeProgress + 0.03 * config.transitionSpeed);
+                        }
+                    });
+                });
+
+                if (photoPlaneMesh) {
+                    photoPlaneMesh.material.opacity = Math.max(0.0, photoPlaneMesh.material.opacity - 0.0015 * config.transitionSpeed);
+                }
+
+                let allFinished = true;
+                for (let i = 0; i < meshParticles.length; i++) {
+                    if (meshParticles[i].decodeProgress < 1.0) {
+                        allFinished = false;
+                        break;
+                    }
+                }
+
+                if (allFinished && recordingState === 'recording') {
+                    postDecodeTimer += 1 / 60;
+                    if (postDecodeTimer >= 3.0) {
+                        stopRecording();
+                    }
+                }
+            } else {
+                imgWaterfalls.forEach(wf => {
+                    wf.y += wf.speed * 0.4;
+                    if (wf.y > rows + 20) {
+                        wf.y = Math.random() * -30;
+                    }
+                });
+            }
+
+            meshParticles.forEach(p => {
+                p.codeSprite.material.opacity = Math.min(0.95, p.decodeProgress);
+
+                if (p.decodeProgress > 0.05) {
+                    const wf = imgWaterfalls[p.col % imgWaterfalls.length];
+                    const distance = p.row - wf.y;
+
+                    if (distance >= 0 && distance < 2.5) {
+                        const randomCharIdx = Math.floor(Math.random() * (charTextures.length - 1));
+                        p.codeSprite.material.map = charTextures[randomCharIdx];
+                        p.codeSprite.material.color.setHex(0xffffff);
+                    } else if (distance >= 2.5 && distance < 6.0) {
+                        p.codeSprite.material.map = charTextures[p.charIdx];
+                        p.codeSprite.material.color = getThemeThreeColor(p.gray * 1.3);
+                    } else {
+                        p.codeSprite.material.map = charTextures[p.charIdx];
+                        p.codeSprite.material.color = getThemeThreeColor(p.gray);
+                    }
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 面板與按鈕點擊邏輯
+        const panel = document.getElementById('controlPanel');
+        const toggleBtn = document.getElementById('togglePanelBtn');
+
+        toggleBtn.addEventListener('click', () => {
+            panel.classList.toggle('collapsed');
+            toggleBtn.innerText = panel.classList.contains('collapsed') ? '⚙️' : '❌';
+        });
+
+        const imageInput = document.getElementById('imageInput');
+        const imgControls = document.getElementById('imgControls');
+
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    uploadedImg = new Image();
+                    uploadedImg.onload = function() {
+                        render3DHeightmapMesh();
+                        imgControls.style.display = 'block';
+                    }
+                    uploadedImg.src = event.target.result;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('btnRemoveImg').addEventListener('click', () => {
+            uploadedImg = null;
+            render3DHeightmapMesh();
+            imageInput.value = '';
+            imgControls.style.display = 'none';
+        });
+
+        document.getElementById('btnResetToPhoto').addEventListener('click', () => {
+            render3DHeightmapMesh();
+        });
+
+        // 1. 啟動照片瀑布雨（不錄影）
+        document.getElementById('btnStartTransition').addEventListener('click', () => {
+            render3DHeightmapMesh();
+            isTransitioning = true;
+            panel.classList.add('collapsed');
+            toggleBtn.innerText = '⚙️';
+        });
+
+        // 2. 啟動照片瀑布雨 + 自動錄影存檔
+        document.getElementById('btnStartWithRecord').addEventListener('click', () => {
+            render3DHeightmapMesh();
+            isTransitioning = true;
+            panel.classList.add('collapsed');
+            toggleBtn.innerText = '⚙️';
+            startRecording(); // 啟動錄影
+        });
+
+        document.getElementById('inputMainText').addEventListener('input', (e) => {
+            config.mainText = e.target.value;
+            render3DHeightmapMesh();
+        });
+
+        document.getElementById('inputSubText').addEventListener('input', (e) => {
+            config.subText = e.target.value;
+            render3DHeightmapMesh();
+        });
+
+        document.getElementById('sliderTransitionSpeed').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            config.transitionSpeed = val;
+            document.getElementById('valTransitionSpeed').innerText = val.toFixed(1) + 'x';
+        });
+
+        document.getElementById('sliderFlowSpeed').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            config.flowSpeed = val;
+            document.getElementById('valFlowSpeed').innerText = val;
+        });
+
+        document.getElementById('sliderDepth').addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            config.depth = val;
+            document.getElementById('valDepth').innerText = val;
+            render3DHeightmapMesh();
+        });
+
+        document.getElementById('sliderImgScale').addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            config.imgScale = val / 100;
+            document.getElementById('valImgScale').innerText = val + '%';
+            render3DHeightmapMesh();
+        });
+
+        document.getElementById('sliderGridDensity').addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            config.gridDensity = val;
+            document.getElementById('valGridDensity').innerText = val;
+            render3DHeightmapMesh();
+        });
+
+        document.getElementById('selectTheme').addEventListener('change', (e) => {
+            config.theme = e.target.value;
+            build3DVolumetricRain();
+            render3DHeightmapMesh();
+        });
+
+        initThree();
+        animate();
+    </script>
+</body>
+</html>
