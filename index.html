@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Matrix Rain - Auto-Record & Repeatable Transition</title>
+    <title>The Matrix Rain - Continuous Dynamic Code Flow</title>
     <style>
         * {
             margin: 0;
@@ -304,7 +304,7 @@
             </div>
 
             <div class="tip-box">
-                💡 頁面已預設自動載入同目錄下的 DSCF2875.jpeg！
+                💡 圖案數字已加強動態隨機跳動與持續瀑布雨！
             </div>
         </div>
     </div>
@@ -387,7 +387,6 @@
             createCharTextures();
             build3DVolumetricRain();
 
-            // 預設載入同一目錄下的 DSCF2875.jpeg 照片
             uploadedImg = new Image();
             uploadedImg.onload = function() {
                 render3DHeightmapMesh();
@@ -587,11 +586,12 @@
                 meshGroup.add(subTextSprite);
             }
 
+            // 初始化持續瀑布雨列
             for (let i = 0; i < cols; i++) {
                 imgWaterfalls.push({
                     col: i,
-                    y: Math.random() * -80,
-                    speed: (config.flowSpeed || 1.2) * (Math.random() * 0.4 + 0.6)
+                    y: Math.random() * (rows + 100) - 50,
+                    speed: (config.flowSpeed || 1.2) * (Math.random() * 0.5 + 0.8)
                 });
             }
         }
@@ -647,12 +647,10 @@
             }
         }
 
-        let flowPhase = 0;
-
         function animate() {
             requestAnimationFrame(animate);
-            flowPhase += config.flowSpeed * 0.4;
 
+            // 背景瀑布雨掉落
             rainGroup.children.forEach(columnGroup => {
                 columnGroup.position.y -= columnGroup.userData.speed;
                 if (columnGroup.position.y < -500) {
@@ -664,20 +662,28 @@
 
             const rows = config.gridDensity;
 
-            if (isTransitioning) {
-                imgWaterfalls.forEach(wf => {
-                    wf.y += wf.speed * 0.35 * config.transitionSpeed;
+            // 圖案內部瀑布雨位置推進 (持續循環)
+            imgWaterfalls.forEach(wf => {
+                wf.y += wf.speed * 0.6;
+                if (wf.y > rows + 20) {
+                    wf.y = -20;
+                }
+            });
 
+            if (isTransitioning) {
+                // 照片緩慢淡出
+                if (photoPlaneMesh) {
+                    photoPlaneMesh.material.opacity = Math.max(0.0, photoPlaneMesh.material.opacity - 0.0015 * config.transitionSpeed);
+                }
+
+                // 隨瀑布雨下落解碼點陣
+                imgWaterfalls.forEach(wf => {
                     meshParticles.forEach(p => {
                         if (p.col === wf.col && p.row <= wf.y) {
                             p.decodeProgress = Math.min(1.0, p.decodeProgress + 0.03 * config.transitionSpeed);
                         }
                     });
                 });
-
-                if (photoPlaneMesh) {
-                    photoPlaneMesh.material.opacity = Math.max(0.0, photoPlaneMesh.material.opacity - 0.0015 * config.transitionSpeed);
-                }
 
                 let allFinished = true;
                 for (let i = 0; i < meshParticles.length; i++) {
@@ -693,15 +699,9 @@
                         stopRecording();
                     }
                 }
-            } else {
-                imgWaterfalls.forEach(wf => {
-                    wf.y += wf.speed * 0.4;
-                    if (wf.y > rows + 20) {
-                        wf.y = Math.random() * -30;
-                    }
-                });
             }
 
+            // 動態強烈瀑布雨與字符隨機跳動渲染
             meshParticles.forEach(p => {
                 p.codeSprite.material.opacity = Math.min(0.95, p.decodeProgress);
 
@@ -709,15 +709,25 @@
                     const wf = imgWaterfalls[p.col % imgWaterfalls.length];
                     const distance = p.row - wf.y;
 
-                    if (distance >= 0 && distance < 2.5) {
+                    // 1. 浪頭 (白色光點，隨機換字)
+                    if (distance >= 0 && distance < 3.0) {
                         const randomCharIdx = Math.floor(Math.random() * (charTextures.length - 1));
                         p.codeSprite.material.map = charTextures[randomCharIdx];
                         p.codeSprite.material.color.setHex(0xffffff);
-                    } else if (distance >= 2.5 && distance < 6.0) {
+                    } 
+                    // 2. 雨波拖尾 (亮綠光)
+                    else if (distance >= 3.0 && distance < 8.0) {
                         p.codeSprite.material.map = charTextures[p.charIdx];
-                        p.codeSprite.material.color = getThemeThreeColor(p.gray * 1.3);
-                    } else {
-                        p.codeSprite.material.map = charTextures[p.charIdx];
+                        p.codeSprite.material.color = getThemeThreeColor(p.gray * 1.4);
+                    } 
+                    // 3. 一般狀態：以 3% 的機率動態跳動字元，打破靜止感
+                    else {
+                        if (Math.random() < 0.03) {
+                            const randIdx = Math.floor(Math.random() * (charTextures.length - 1));
+                            p.codeSprite.material.map = charTextures[randIdx];
+                        } else {
+                            p.codeSprite.material.map = charTextures[p.charIdx];
+                        }
                         p.codeSprite.material.color = getThemeThreeColor(p.gray);
                     }
                 }
